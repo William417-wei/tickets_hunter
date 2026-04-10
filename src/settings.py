@@ -455,8 +455,15 @@ class FetchTixcraftCookieHandler(tornado.web.RequestHandler):
             self.write({"success": False, "message": "請先安裝 browser-cookie3：pip install browser-cookie3"})
             return
         try:
+            import platform
             cookie_names = ["TIXUISID", "IVUISID", "TIXPUISID"]
-            chrome_base = os.path.expanduser("~/Library/Application Support/Google/Chrome")
+            system = platform.system()
+            if system == "Windows":
+                local_app_data = os.environ.get("LOCALAPPDATA", "")
+                chrome_base = os.path.join(local_app_data, "Google", "Chrome", "User Data")
+            else:
+                # macOS / Linux
+                chrome_base = os.path.expanduser("~/Library/Application Support/Google/Chrome")
             # 掃所有 Chrome profile
             profiles = ["Default"]
             if os.path.isdir(chrome_base):
