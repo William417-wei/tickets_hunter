@@ -44,8 +44,8 @@ logs.txt
 .env.*
 
 # Private documentation (Claude Code)
-.claude/
-CLAUDE.md
+.claude/*
+!.claude/CLAUDE.md
 /docs/
 .specify/
 specs/
