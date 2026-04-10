@@ -13,6 +13,7 @@ import webbrowser
 from datetime import datetime
 
 import tornado
+import tornado.ioloop
 from tornado.web import Application
 from tornado.web import StaticFileHandler
 
@@ -416,8 +417,8 @@ def clean_tmp_file():
 class NoCacheStaticFileHandler(StaticFileHandler):
     """Custom StaticFileHandler that prevents caching of settings.html"""
     def set_extra_headers(self, path):
-        # Disable caching only for settings.html to prevent stale UI issues
-        if path == 'settings.html':
+        # Disable caching for settings.html and JS files to prevent stale UI issues
+        if path == 'settings.html' or path.endswith('.js'):
             self.set_header('Cache-Control', 'no-cache, no-store, must-revalidate')
             self.set_header('Pragma', 'no-cache')
             self.set_header('Expires', '0')
@@ -445,6 +446,36 @@ class QuestionHandler(tornado.web.RequestHandler):
 class VersionHandler(tornado.web.RequestHandler):
     def get(self):
         self.write({"version":self.application.version})
+
+class FetchTixcraftCookieHandler(tornado.web.RequestHandler):
+    def get(self):
+        try:
+            import browser_cookie3
+        except ImportError:
+            self.write({"success": False, "message": "請先安裝 browser-cookie3：pip install browser-cookie3"})
+            return
+        try:
+            cookie_names = ["TIXUISID", "IVUISID", "TIXPUISID"]
+            chrome_base = os.path.expanduser("~/Library/Application Support/Google/Chrome")
+            # 掃所有 Chrome profile
+            profiles = ["Default"]
+            if os.path.isdir(chrome_base):
+                profiles += [d for d in os.listdir(chrome_base) if d.startswith("Profile")]
+            for profile in profiles:
+                cookie_file = os.path.join(chrome_base, profile, "Cookies")
+                if not os.path.exists(cookie_file):
+                    continue
+                try:
+                    cookiejar = browser_cookie3.chrome(cookie_file=cookie_file)
+                    for cookie in cookiejar:
+                        if cookie.name in cookie_names and len(cookie.value) > 1:
+                            self.write({"success": True, "cookie": cookie.value, "name": cookie.name, "profile": profile})
+                            return
+                except Exception:
+                    pass
+            self.write({"success": False, "message": "找不到 TIXUISID cookie，請確認已在 Chrome 登入拓元（tixcraft.com）"})
+        except Exception as exc:
+            self.write({"success": False, "message": str(exc)})
 
 class ShutdownHandler(tornado.web.RequestHandler):
     def get(self):
@@ -786,6 +817,8 @@ async def main_server():
         ("/resume", ResumeHandler),
         ("/run", RunHandler),
         
+        ("/fetch_cookie", FetchTixcraftCookieHandler),
+
         # json api
         ("/load", LoadJsonHandler),
         ("/save", SaveJsonHandler),
